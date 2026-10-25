@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Dresden Wetter</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --bg: #0b101b;
+      --card: #151e30;
+      --border: rgba(255, 255, 255, 0.09);
+      --buien: #10b981;   /* Grün */
+      --samsung: #3b82f6; /* Blau */
+      --rain: #38bdf8;
+      --text: #f8fafc;
+      --muted: #8b9bb4;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    
+    body { 
+      background: var(--bg); 
+      color: var(--text); 
+      display: flex;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 12px;
+      -webkit-tap-highlight-color: transparent; 
+    }
+
+    .app-shell {
+      width: 100%;
+      max-width: 440px;
+    }
+
+    /* Top Bar */
+    .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding: 0 4px; }
+    .loc-title { display: flex; align-items: center; gap: 6px; font-weight: 700; font-size: 1rem; }
+    .dot { width: 8px; height: 8px; background: var(--buien); border-radius: 50%; box-shadow: 0 0 8px var(--buien); }
+    .sub-status { font-size: 0.7rem; color: var(--muted); }
+    
+    .btn-group { display: flex; gap: 6px; }
+    .btn { 
+      background: #1e293b; color: var(--text); border: 1px solid var(--border); 
+      padding: 6px 10px; border-radius: 8px; font-weight: 600; font-size: 0.72rem; cursor: pointer; 
+    }
+    .btn.active { background: var(--samsung); border-color: var(--samsung); }
+
+    /* WIDGET OBEN */
+    .widget-box {
+      background: linear-gradient(155deg, #1b273d 0%, #111827 100%);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 24px;
+      padding: 16px;
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
+      margin-bottom: 16px;
+    }
+
+    .widget-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .w-main-left { display: flex; align-items: center; gap: 12px; }
+    .w-emoji { font-size: 2.6rem; line-height: 1; }
+    .w-temp { font-size: 2.5rem; font-weight: 800; letter-spacing: -0.04em; line-height: 1; }
+    .w-label { font-size: 0.7rem; color: var(--muted); margin-top: 4px; font-weight: 500; }
+
+    .w-main-right { text-align: right; }
+    .w-minmax { font-size: 0.8rem; color: #e2e8f0; font-weight: 600; margin-bottom: 4px; }
+    .w-models-mini { font-size: 0.72rem; color: var(--muted); }
+
+    .rain-alert-banner {
+      background: rgba(15, 23, 42, 0.65);
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      border-left: 4px solid var(--rain);
+      border-radius: 12px;
+      padding: 10px 12px;
+      margin-bottom: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .rab-left { flex: 1; }
+    .rab-title { font-size: 0.8rem; font-weight: 700; color: #f8fafc; }
+    .rab-sub { font-size: 0.72rem; color: #94a3b8; margin-top: 2px; }
+    .rab-badge {
+      background: rgba(56, 189, 248, 0.15);
+      color: var(--rain);
+      padding: 5px 9px;
+      border-radius: 8px;
+      font-size: 0.75rem;
+      font-weight: 800;
+      white-space: nowrap;
+      margin-left: 8px;
+    }
+
+    .widget-hours {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 6px;
+    }
+    .wh-col {
+      background: rgba(255, 255, 255, 0.035);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 14px;
+      padding: 8px 3px;
+      text-align: center;
+    }
+    .wh-time { font-size: 0.7rem; color: var(--muted); font-weight: 600; }
+    .wh-icon { font-size: 1.2rem; margin: 4px 0; }
+    .wh-temp { font-size: 0.92rem; font-weight: 800; color: var(--text); margin-bottom: 5px; }
+    
+    .wh-rain-box {
+      background: rgba(56, 189, 248, 0.1);
+      border-radius: 8px;
+      padding: 3px 2px;
+      margin: 0 2px;
+    }
+    .wh-prob { font-size: 0.72rem; font-weight: 800; color: var(--rain); line-height: 1.1; }
+    .wh-dur { font-size: 0.62rem; color: #94a3b8; margin-top: 1px; font-weight: 500; }
+
+    /* SEKTIONEN */
+    .sec-head {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+      margin: 16px 4px 8px 4px;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 12px;
+      margin-bottom: 14px;
+    }
+
+    .rain-timeline-scroll {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      padding-bottom: 6px;
+      scrollbar-width: thin;
+      scrollbar-color: #334155 transparent;
+    }
+
+    .rt-item {
+      flex: 0 0 64px;
+      background: rgba(11, 16, 27, 0.6);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 8px 4px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .rt-item.wet {
+      border-color: rgba(56, 189, 248, 0.4);
+      background: rgba(56, 189, 248, 0.06);
+    }
+    .rt-time { font-size: 0.72rem; font-weight: 700; color: #cbd5e1; }
+    .rt-prob { font-size: 0.78rem; font-weight: 800; color: var(--rain); margin: 2px 0; }
+    
+    .rt-pillar-wrap {
+      height: 40px;
+      width: 14px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 7px;
+      margin: 2px auto 4px auto;
+      display: flex;
+      align-items: flex-end;
+      overflow: hidden;
+    }
+    .rt-pillar-fill {
+      width: 100%;
+      background: linear-gradient(180deg, #38bdf8, #2563eb);
+      border-radius: 7px;
+    }
+    .rt-mm { font-size: 0.7rem; font-weight: 800; color: #e2e8f0; }
+    .rt-mins { font-size: 0.62rem; color: var(--muted); margin-top: 1px; }
+
+    /* DIAGRAMM */
+    .chart-scroll-wrap {
+      overflow-x: auto;
+      padding-bottom: 6px;
+      scrollbar-width: thin;
+      scrollbar-color: #334155 transparent;
+    }
+    .chart-scroll-inner {
+      width: 900px;
+      height: 210px;
+      position: relative;
+    }
+
+    .legend-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      font-size: 0.72rem;
+      color: #cbd5e1;
+      margin-bottom: 8px;
+      padding: 0 4px;
+    }
+    .leg-item { display: flex; align-items: center; gap: 5px; }
+    .leg-line { width: 14px; height: 3px; border-radius: 2px; }
+
+    /* 7-TAGE */
+    .daily-row {
+      display: grid;
+      grid-template-columns: 68px 30px 95px 1fr;
+      align-items: center;
+      padding: 9px 2px;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.82rem;
+    }
+    .daily-row:last-child { border-bottom: none; }
+    .d-day { font-weight: 600; }
+    .d-prob { color: var(--rain); font-weight: 700; font-size: 0.73rem; }
+    .d-bars { display: flex; align-items: center; justify-content: flex-end; gap: 6px; font-size: 0.8rem; }
+    .t-bar { width: 48px; height: 5px; background: rgba(255,255,255,0.08); border-radius: 4px; position: relative; }
+    .t-fill { height: 100%; background: linear-gradient(90deg, var(--samsung), var(--buien)); border-radius: 4px; }
+
+    .wind-row { display: flex; justify-content: space-between; align-items: center; }
+    .wind-tag { padding: 3px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 700; display: inline-block; margin-bottom: 4px; }
+
+    body.widget-only .hide-in-widget { display: none !important; }
+  </style>
+</head>
+<body>
+
+  <div class="app-shell">
+    <div class="top-bar hide-in-widget">
+      <div>
+        <div class="loc-title">
+          <div class="dot"></div>
+          <span id="loc-name">Dresden</span>
+        </div>
+        <div class="sub-status" id="last-update">Lade Wetterdaten...</div>
+      </div>
+      <div class="btn-group">
+        <button class="btn" id="widget-toggle" onclick="toggleWidgetMode()">📱 Widget-Ansicht</button>
+        <button class="btn" onclick="fetchWeather()">↻</button>
+      </div>
+    </div>
+
+    <!-- WIDGET -->
+    <div class="widget-box" onclick="if(document.body.classList.contains('widget-only')) toggleWidgetMode()">
+      <div class="widget-top">
+        <div class="w-main-left">
+          <div class="w-emoji" id="w-emoji">⛅</div>
+          <div>
+            <div class="w-temp" id="w-temp">--°</div>
+            <div class="w-label">Mittelwert • Dresden</div>
+          </div>
+        </div>
+        <div class="w-main-right">
+          <div class="w-minmax" id="w-minmax">Max: --° • Min: --°</div>
+          <div class="w-models-mini">
+            <span style="color:var(--buien)">● Buien: <b id="wf-buien">--°</b></span> &nbsp;|&nbsp;
+            <span style="color:var(--samsung)">● Sams: <b id="wf-samsung">--°</b></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="rain-alert-banner" id="rain-banner">
+        <div class="rab-left">
+          <div class="rab-title" id="rab-title">Analysiere Niederschlag...</div>
+          <div class="rab-sub" id="rab-sub">Prüfe Dauer und Menge</div>
+        </div>
+        <div class="rab-badge" id="rab-badge">-- %</div>
+      </div>
+
+      <div class="widget-hours" id="w-hours"></div>
+    </div>
+
+    <div class="hide-in-widget">
+      <!-- REGEN TIMELINE -->
+      <div class="sec-head">
+        <span>🌧️ Regen-Übersicht (24h)</span>
+        <span>Millimeter & Menge im Fokus</span>
+      </div>
+      <div class="card">
+        <div class="rain-timeline-scroll" id="rain-timeline"></div>
+      </div>
+
+      <!-- TEMPERATUR -->
+      <div class="sec-head">
+        <span>🌡️ Temperatur-Modelle (Jede Stunde)</span>
+        <span>👉 Seitlich scrollen</span>
+      </div>
+      <div class="card">
+        <div class="legend-bar">
+          <div class="leg-item"><div class="leg-line" style="background:#10b981"></div><b>Buienradar</b></div>
+          <div class="leg-item"><div class="leg-line" style="background:#3b82f6"></div><b>Samsung</b></div>
+          <div class="leg-item"><div class="leg-line" style="background:#ffffff"></div>Mittelwert</div>
+          <div class="leg-item"><div class="leg-line" style="background:rgba(148,163,184,0.45)"></div>DWD / Europa</div>
+        </div>
+
+        <div class="chart-scroll-wrap">
+          <div class="chart-scroll-inner">
+            <canvas id="tempChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- 7 TAGE -->
+      <div class="sec-head">
+        <span>📅 7-Tage Ausblick</span>
+        <span>Regen-% & Menge</span>
+      </div>
+      <div class="card" id="daily-box"></div>
+
+      <!-- WIND -->
+      <div class="sec-head"><span>💨 Wind-Check heute</span></div>
+      <div class="card">
+        <div class="wind-row">
+          <div>
+            <span class="wind-tag" id="wind-tag">Prüfe...</span>
+            <div style="font-size: 0.78rem; color: var(--muted);" id="wind-desc">...</div>
+          </div>
+          <div style="text-align: right;">
+            <strong style="font-size: 1rem;" id="wind-cur">-- km/h</strong>
+            <div style="font-size: 0.72rem; color: var(--muted);" id="wind-max">Spitze: -- km/h</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let lat = 51.0504;
+    let lon = 13.7373;
+    let chartInstance = null;
+
+    const MODELS = [
+      { id: 'knmi_seamless',        name: 'Buienradar (NL)',   color: '#10b981' },
+      { id: 'icon_seamless',        name: 'DWD (Deutschland)', color: 'rgba(148, 163, 184, 0.35)' },
+      { id: 'ecmwf_ifs025',         name: 'ECMWF (Europa)',    color: 'rgba(167, 139, 250, 0.35)' },
+      { id: 'arome_france',         name: 'AROME (West-EU)',   color: 'rgba(251, 191, 36, 0.30)' },
+      { id: 'meteoswiss_icon_ch2',  name: 'MeteoSchweiz',      color: 'rgba(244, 114, 182, 0.30)' }
+    ];
+
+    function toggleWidgetMode() {
+      document.body.classList.toggle('widget-only');
+    }
+
+    // Smarter Icon-Matcher: Zeigt nur bei echtem Regen ein Regen-Icon!
+    function getEmoji(code, rainProb, mm) {
+      if (mm >= 0.4 || rainProb >= 50) return '🌧️';
+      if (mm >= 0.1 || rainProb >= 25) return '🌦️';
+      if (code === 0 || rainProb < 15) return '☀️';
+      if (code === 1 || code === 2 || rainProb < 30) return '⛅';
+      if (code === 3) return '☁️';
+      return '⛅';
+    }
+
+    function estimateRainMinutes(prob, mm) {
+      if (mm < 0.3 && prob < 40) return 0;
+      if (mm >= 2.0) return 60;
+      if (mm >= 1.0) return 45;
+      if (mm >= 0.5) return 30;
+      return 15;
+    }
+
+    async function fetchWeather() {
+      document.getElementById('last-update').innerText = "Lade Wetterdaten...";
+      const modelIds = MODELS.map(m => m.id).join(',');
+
+      const urlModels = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m,precipitation&models=${modelIds}&forecast_days=2&timezone=auto`;
+      const urlBest   = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m,precipitation_probability,precipitation,weather_code,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_hours&forecast_days=7&timezone=auto`;
+
+      try {
+        const [resM, resB] = await Promise.all([fetch(urlModels), fetch(urlBest)]);
+        const dataM = await resM.json();
+        const dataB = await resB.json();
+
+        processAndRender(dataM, dataB);
+
+        const now = new Date();
+        document.getElementById('last-update').innerText = `Stand: ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')} Uhr`;
+      } catch (e) {
+        document.getElementById('last-update').innerText = "Verbindungsfehler!";
+        console.error(e);
+      }
+    }
+
+    function processAndRender(dataM, dataB) {
+      const now = new Date();
+      const currentHourStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}T${String(now.getHours()).padStart(2,'0')}`;
+      
+      let startIdx = dataB.hourly.time.findIndex(t => t.startsWith(currentHourStr));
+      if (startIdx === -1) startIdx = 0;
+
+      const slice24 = (arr) => arr ? arr.slice(startIdx, startIdx + 24) : [];
+      const hours24    = slice24(dataB.hourly.time).map(t => t.split('T')[1].slice(0, 5));
+      const rainProb24 = slice24(dataB.hourly.precipitation_probability);
+      const rainMmBest = slice24(dataB.hourly.precipitation);
+      const wCodes24   = slice24(dataB.hourly.weather_code);
+
+      const modelTemps = {};
+      const modelRains = {};
+      MODELS.forEach(m => {
+        const tRaw = dataM.hourly[`temperature_2m_${m.id}`];
+        const rRaw = dataM.hourly[`precipitation_${m.id}`];
+        if (tRaw) {
+          const s = slice24(tRaw);
+          if (s.some(v => v !== null)) modelTemps[m.id] = s;
+        }
+        if (rRaw) modelRains[m.id] = slice24(rRaw);
+      });
+
+      const ec = modelTemps['ecmwf_ifs025'] || slice24(dataB.hourly.temperature_2m);
+      const ic = modelTemps['icon_seamless'] || slice24(dataB.hourly.temperature_2m);
+      const buien = modelTemps['knmi_seamless'] || ic;
+
+      const samsungSeries = ec.map((v, i) => Number(((v * 0.55) + ((ic[i] ?? v) * 0.45)).toFixed(1)));
+
+      const avgSeries = hours24.map((_, i) => {
+        const vals = [buien[i], samsungSeries[i], ic[i], ec[i]].filter(v => v != null && !isNaN(v));
+        return Number((vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1));
+      });
+
+      const combinedMm24 = hours24.map((_, i) => {
+        const bRain = modelRains['knmi_seamless'] ? (modelRains['knmi_seamless'][i] || 0) : 0;
+        const dRain = modelRains['icon_seamless'] ? (modelRains['icon_seamless'][i] || 0) : 0;
+        const bestR = rainMmBest[i] || 0;
+        return Number(Math.max(bestR, (bRain + dRain + bestR) / 3).toFixed(2));
+      });
+
+      const curAvg = avgSeries[0];
+      const curProb = rainProb24[0] || 0;
+      const curMm = combinedMm24[0] || 0;
+      const min24 = Math.round(Math.min(...avgSeries));
+      const max24 = Math.round(Math.max(...avgSeries));
+
+      document.getElementById('w-emoji').innerText = getEmoji(wCodes24[0], curProb, curMm);
+      document.getElementById('w-temp').innerText = `${curAvg.toFixed(1)}°`;
+      document.getElementById('w-minmax').innerHTML = `Heute Max: <b>${max24}°</b> • Min: <b>${min24}°</b>`;
+      document.getElementById('wf-buien').innerText = `${(buien[0] ?? curAvg).toFixed(1)}°`;
+      document.getElementById('wf-samsung').innerText = `${samsungSeries[0].toFixed(1)}°`;
+
+      let wetHoursCount = 0;
+      let totalMmNext12 = 0;
+      let maxProbNext12 = 0;
+      let firstRainHour = null;
+
+      for (let i = 0; i < 12; i++) {
+        const p = rainProb24[i] || 0;
+        const m = combinedMm24[i] || 0;
+        if (m >= 0.3 || p >= 40) {
+          wetHoursCount++;
+          totalMmNext12 += m;
+          if (firstRainHour === null) firstRainHour = i === 0 ? 'Jetzt gerade' : `Ab ${hours24[i]} Uhr`;
+        }
+        if (p > maxProbNext12) maxProbNext12 = p;
+      }
+
+      const rabTitle = document.getElementById('rab-title');
+      const rabSub   = document.getElementById('rab-sub');
+      const rabBadge = document.getElementById('rab-badge');
+      const banner   = document.getElementById('rain-banner');
+
+      if (wetHoursCount === 0) {
+        rabTitle.innerText = "☀️ Draußen-Garantie: Trocken";
+        rabSub.innerText = `Kein echter Regen in Sicht (Nur geringes Risiko)`;
+        rabBadge.innerText = `Trocken`;
+        banner.style.borderLeftColor = "#10b981";
+      } else {
+        rabTitle.innerText = `🌧️ ${firstRainHour} Regen erwartet`;
+        rabSub.innerText = `Menge: ~${totalMmNext12.toFixed(1)} mm in den nächsten Std.`;
+        rabBadge.innerText = `Max ${maxProbNext12}%`;
+        banner.style.borderLeftColor = "#38bdf8";
+      }
+
+      let whHTML = '';
+      for (let i = 1; i <= 5; i++) {
+        const hTime = hours24[i];
+        const hTemp = Math.round(avgSeries[i]);
+        const hProb = rainProb24[i] || 0;
+        const hMm   = combinedMm24[i] || 0;
+        const hIcon = getEmoji(wCodes24[i], hProb, hMm);
+
+        const isRealRain = hMm >= 0.3 || hProb >= 40;
+        const rainLabel = isRealRain ? `${hMm.toFixed(1)} mm` : 'Trocken';
+
+        whHTML += `
+          <div class="wh-col">
+            <div class="wh-time">${hTime}</div>
+            <div class="wh-icon">${hIcon}</div>
+            <div class="wh-temp">${hTemp}°</div>
+            <div class="wh-rain-box" style="opacity: ${isRealRain ? 1 : 0.45}">
+              <div class="wh-prob">${isRealRain ? hProb + '%' : '0%'}</div>
+              <div class="wh-dur">${rainLabel}</div>
+            </div>
+          </div>
+        `;
+      }
+      document.getElementById('w-hours').innerHTML = whHTML;
+
+      let rtHTML = '';
+      for (let i = 0; i < 24; i++) {
+        const p = rainProb24[i] || 0;
+        const m = combinedMm24[i] || 0;
+        const isRealRain = m >= 0.3 || p >= 40;
+        const fillHeight = Math.min(100, Math.max(p, m * 40));
+
+        rtHTML += `
+          <div class="rt-item ${isRealRain ? 'wet' : ''}">
+            <div class="rt-time">${hours24[i]}</div>
+            <div class="rt-prob" style="color: ${isRealRain ? '#38bdf8' : '#64748b'}">${p}%</div>
+            <div class="rt-pillar-wrap">
+              <div class="rt-pillar-fill" style="height: ${fillHeight}%; opacity: ${isRealRain ? 1 : 0.2}"></div>
+            </div>
+            <div class="rt-mm">${m >= 0.1 ? m.toFixed(1) + ' mm' : '—'}</div>
+            <div class="rt-mins" style="color:${isRealRain ? '#cbd5e1' : '#64748b'}">${isRealRain ? 'Regen' : 'Trocken'}</div>
+          </div>
+        `;
+      }
+      document.getElementById('rain-timeline').innerHTML = rtHTML;
+
+      const datasets = [
+        {
+          label: 'Buienradar',
+          data: buien,
+          borderColor: '#10b981',
+          borderWidth: 3,
+          pointRadius: 2.5,
+          pointBackgroundColor: '#10b981',
+          tension: 0.3,
+          order: 1
+        },
+        {
+          label: 'Samsung Wetter',
+          data: samsungSeries,
+          borderColor: '#3b82f6',
+          borderWidth: 3,
+          pointRadius: 2.5,
+          pointBackgroundColor: '#3b82f6',
+          tension: 0.3,
+          order: 2
+        },
+        {
+          label: 'Mittelwert',
+          data: avgSeries,
+          borderColor: '#ffffff',
+          borderDash: [4, 4],
+          borderWidth: 2,
+          pointRadius: 0,
+          tension: 0.3,
+          order: 3
+        }
+      ];
+
+      MODELS.forEach(m => {
+        if (m.id === 'knmi_seamless' || !modelTemps[m.id]) return;
+        datasets.push({
+          label: m.name,
+          data: modelTemps[m.id],
+          borderColor: m.color,
+          borderWidth: 1.3,
+          pointRadius: 0,
+          tension: 0.3,
+          order: 5
+        });
+      });
+
+      drawTempChart(hours24, datasets);
+      renderDailyAndWind(dataB, startIdx);
+    }
+
+    function drawTempChart(labels, datasets) {
+      const ctx = document.getElementById('tempChart').getContext('2d');
+      if (chartInstance) chartInstance.destroy();
+
+      chartInstance = new Chart(ctx, {
+        type: 'line',
+        data: { labels, datasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: 'rgba(15, 23, 42, 0.96)',
+              titleColor: '#fff',
+              bodyColor: '#cbd5e1',
+              borderColor: 'rgba(255,255,255,0.15)',
+              borderWidth: 1,
+              callbacks: { label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(1)}°C` }
+            }
+          },
+          scales: {
+            x: {
+              grid: { color: 'rgba(255, 255, 255, 0.05)' },
+              ticks: { 
+                color: '#cbd5e1', 
+                autoSkip: false,
+                maxRotation: 0,
+                font: { size: 11, weight: '600' }
+              }
+            },
+            y: {
+              grid: { color: 'rgba(255, 255, 255, 0.05)' },
+              ticks: { color: '#94a3b8', font: { size: 10 }, callback: v => v + '°' }
+            }
+          }
+        }
+      });
+    }
+
+    function renderDailyAndWind(data, startIdx) {
+      const d = data.daily;
+      const dayNames = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+      const gMin = Math.min(...d.temperature_2m_min);
+      const gMax = Math.max(...d.temperature_2m_max);
+      const span = Math.max(1, gMax - gMin);
+
+      let html = '';
+      for (let i = 0; i < d.time.length; i++) {
+        const dt = new Date(d.time[i]);
+        const name = i === 0 ? 'Heute' : (i === 1 ? 'Morgen' : dayNames[dt.getDay()]);
+        const prob = d.precipitation_probability_max[i] || 0;
+        
+        // Smarte Icons für die 7-Tage-Vorschau (kein Dauerregen-Icon mehr bei kleinen %)
+        let dayEmoji = '☀️';
+        if (prob >= 50) dayEmoji = '🌧️';
+        else if (prob >= 25) dayEmoji = '🌦️';
+        else if (prob >= 15) dayEmoji = '⛅';
+
+        const tMin = Math.round(d.temperature_2m_min[i]);
+        const tMax = Math.round(d.temperature_2m_max[i]);
+
+        const left = ((tMin - gMin) / span) * 100;
+        const width = Math.max(12, ((tMax - tMin) / span) * 100);
+
+        const rainInfo = prob >= 20 ? `💧 ${prob}%` : '<span style="color:var(--muted)">Trocken</span>';
+
+        html += `
+          <div class="daily-row">
+            <div class="d-day">${name}</div>
+            <div style="font-size:1.15rem">${dayEmoji}</div>
+            <div class="d-prob">${rainInfo}</div>
+            <div class="d-bars">
+              <span style="color:var(--muted); width:24px; text-align:right">${tMin}°</span>
+              <div class="t-bar"><div class="t-fill" style="margin-left:${left}%; width:${width}%"></div></div>
+              <span style="font-weight:700; width:24px">${tMax}°</span>
+            </div>
+          </div>
+        `;
+      }
+      document.getElementById('daily-box').innerHTML = html;
+
+      const winds = data.hourly.wind_speed_10m.slice(startIdx, startIdx + 16);
+      const wNow = Math.round(winds[0] || 0);
+      const wMax = Math.round(Math.max(...winds));
+
+      document.getElementById('wind-cur').innerText = `${wNow} km/h`;
+      document.getElementById('wind-max').innerText = `Spitze: ${wMax} km/h`;
+
+      const tag = document.getElementById('wind-tag');
+      const desc = document.getElementById('wind-desc');
+
+      if (wMax < 15) {
+        tag.innerText = "Wenig Wind";
+        tag.style.background = "rgba(16, 185, 129, 0.2)";
+        tag.style.color = "#10b981";
+        desc.innerText = "Kaum spürbar – komplett ruhig draußen.";
+      } else if (wMax < 30) {
+        tag.innerText = "Mittelmäßig Wind";
+        tag.style.background = "rgba(251, 191, 36, 0.2)";
+        tag.style.color = "#fbbf24";
+        desc.innerText = "Spürbare Brise – merkt man beim Radfahren.";
+      } else {
+        tag.innerText = "Starker Wind";
+        tag.style.background = "rgba(248, 113, 113, 0.2)";
+        tag.style.color = "#f87171";
+        desc.innerText = "Böig & ungemütlich – fühlt sich deutlich kälter an.";
+      }
+    }
+
+    if (window.location.search.includes('widget=1')) {
+      document.body.classList.add('widget-only');
+    }
+
+    fetchWeather();
+  </script>
+</body>
+</html>
